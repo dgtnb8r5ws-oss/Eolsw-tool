@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EOLSW Decision Tool</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: -apple-system, Arial, sans-serif;
+    background: #eef2f5;
+}
+
+.header {
+    background: #003366;
+    color: white;
+    padding: 16px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.container {
+    max-width: 600px;
+    margin: auto;
+    padding: 16px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+h3 {
+    margin-top: 0;
+    color: #003366;
+}
+
+p {
+    color: #444;
+    margin-bottom: 10px;
+}
+
+button {
+    width: 100%;
+    padding: 14px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 8px;
+    background: #0078d4;
+    color: white;
+    font-size: 16px;
+}
+
+button.secondary {
+    background: #6c757d;
+}
+
+button:active {
+    opacity: 0.9;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+.result {
+    padding: 18px;
+    border-radius: 10px;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.pass {
+    background: #e6f4ea;
+    color: #1e7e34;
+}
+
+.fail {
+    background: #fdecea;
+    color: #a71d2a;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 15px;
+    font-size: 12px;
+    color: #777;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">EOLSW Decision Tool</div>
+
+<div class="container">
+    <div id="app" class="card"></div>
+    <div class="footer">Prototype – For demonstration purposes</div>
+</div>
+
+<script>
+
+let state = {};
+
+function render(content) {
+    document.getElementById("app").innerHTML = content;
+}
+
+function start() {
+    render(        <h3>Start Assessment</h3>         <p>This tool guides you through EOLSW decision criteria.</p>         <button onclick="selectHC()">Begin</button>    );
+}
+
+function selectHC() {
+    render(        <h3>Hazard Class</h3>         <p>Select the applicable hazard class:</p>         <button onclick="setHC(1)">Class 1</button>         <button onclick="setHC(2)">Class 2</button>         <button onclick="setHC(3)">Class 3</button>         <button onclick="setHC(4)">Class 4</button>    );
+}
+
+function setHC(hc) {
+    state.hc = hc;
+    render(        <h3>Process Isolation Points</h3>         <p>Enter the number of process EIDs involved:</p>         <input type="number" id="eids" placeholder="e.g. 3">         <button onclick="setEIDs()">Continue</button>    );
+}
+
+function setEIDs() {
+    state.eids = parseInt(document.getElementById("eids").value);
+
+    if (!state.eids) return alert("Enter a valid number");
+
+    if (state.hc == 1 && state.eids > 5) {
+        return fail("HC1 limit exceeded (max 5 with purge system). Escalate.");
+    }
+
+    if (state.hc > 1 && state.eids > 8) {
+        return fail("Maximum of 8 EIDs exceeded. Escalate.");
+    }
+
+    if (state.hc == 1 && state.eids > 3) {
+        render(            <h3>Purge System Check</h3>             <p>Are EIDs 4 & 5 part of a purge system?</p>             <button onclick="checkDistance()">Yes</button>             <button onclick="fail('Purge system required for HC1 above 3 EIDs.')">No</button>        );
+    } else {
+        checkDistance();
+    }
+}
+
+function checkDistance() {
+    render(        <h3>Immediate Control</h3>         <p>Are all EIDs within immediate control?</p>         <p><strong>HC1:</strong> 3m &nbsp;&nbsp; <strong>HC2–4:</strong> 8m</p>         <button onclick="nonProcess()">Yes</button>         <button onclick="fail('EIDs must be within immediate control.')">No</button>    );
+}
+
+function nonProcess() {
+    render(        <h3>Non-Process Isolations</h3>         <p>Are there any non-process EIDs (e.g. electrical)?</p>         <button onclick="training()">No</button>         <button onclick="securedCheck()">Yes</button>    );
+}
+
+function securedCheck() {
+    render(        <h3>Isolation Status</h3>         <p>Are non-process EIDs secured or controlled?</p>         <button onclick="training()">Yes</button>         <button onclick="fail('Non-process EIDs must be secured.')">No</button>    );
+}
+
+function training() {
+    render(        <h3>Operator Competency</h3>         <p>Select operator level:</p>         <button onclick="setLevel('basic')">Basic</button>         <button onclick="setLevel('advanced')">Advanced</button>    );
+}
+
+function setLevel(level) {
+    state.level = level;
+
+    render(        <h3>Task Scope</h3>         <p>Is the task within BASIC pipefitting scope?</p>         <button onclick="setTask(true)">Within scope</button>         <button onclick="setTask(false)">Outside scope</button>    );
+}
+
+function setTask(isBasic) {
+    state.taskBasic = isBasic;
+    evaluate();
+}
+
+function evaluate() {
+
+    if (state.hc == 1 && state.level !== "advanced") {
+        return fail("HC1 requires an Advanced operator.");
+    }
+
+    if (!state.taskBasic && state.level === "basic") {
+        return fail("Task outside Basic scope. Escalate.");
+    }
+
+    let notes = [];
+    notes.push("Complete within 4 hours (unless specialist work).");
+    notes.push("If continuity breaks, treat as separate EOLSWs.");
+    
+    if (!state.taskBasic && state.level === "advanced") {
+        notes.push("Advanced operator may act as Maintenance Tech.");
+    }
+
+    showResult("EOLSW Permitted", notes.join("<br><br>"));
+}
+
+function showResult(title, detail) {
+    render(        <div class="result pass">             ✔ ${title}<br><br>${detail}         </div>         <button onclick="start()">New Assessment</button>    );
+}
+
+function fail(reason) {
+    render(        <div class="result fail">             ✖ EOLSW Not Permitted<br><br>${reason}         </div>         <button onclick="start()">New Assessment</button>    );
+}
+
+start();
+
+</script>
+
+</body>
+</html>
